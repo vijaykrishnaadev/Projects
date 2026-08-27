@@ -19,6 +19,7 @@ public class CloudSchedulerApplication {
 				"service", "cloud-task-scheduling",
 				"status", "UP",
 				"health", "/api/v1/health",
+				"mobileClient", "/mobile.html",
 				"tasks", "/api/v1/tasks",
 				"vms", "/api/v1/vms",
 				"phones", "/api/v1/phones");

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud Task Mobile</title>
+  <style>
+    :root { color-scheme: light; --ink: #17202a; --muted: #66737f; --paper: #f4f1ea; --card: #fffdf8; --accent: #e05d3f; --line: #ded8cc; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top right, #f8c9a9 0, transparent 32%), var(--paper); color: var(--ink); font: 16px/1.5 Georgia, serif; }
+    main { width: min(100% - 32px, 560px); margin: 0 auto; padding: 44px 0; }
+    .eyebrow { color: var(--accent); font: 700 12px/1.2 sans-serif; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { margin: 8px 0 28px; font-size: clamp(36px, 10vw, 62px); line-height: .98; font-weight: 500; }
+    section { background: var(--card); border: 1px solid var(--line); padding: 22px; box-shadow: 8px 8px 0 #e7dfd1; }
+    label { display: block; margin: 16px 0 7px; font: 700 13px sans-serif; }
+    input, textarea, select, button { width: 100%; border: 1px solid var(--line); border-radius: 3px; padding: 12px; font: inherit; }
+    textarea { min-height: 120px; resize: vertical; }
+    button { margin-top: 18px; border: 0; background: var(--accent); color: white; font: 700 15px sans-serif; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #connection { color: var(--muted); font: 13px sans-serif; }
+    #result { margin-top: 22px; padding: 14px; background: #f1eee7; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Mobile task client</div>
+    <h1>Send work to the cloud.</h1>
+    <section>
+      <div id="connection">Connecting this phone...</div>
+      <form id="task-form">
+        <label for="task-type">Task</label>
+        <select id="task-type">
+          <option value="WORD_COUNT">Count words</option>
+          <option value="UPPERCASE">Convert to uppercase</option>
+          <option value="REVERSE">Reverse text</option>
+        </select>
+        <label for="input">Input</label>
+        <textarea id="input" required placeholder="Type text to send to the PC..."></textarea>
+        <button id="send" type="submit" disabled>Send task to PC</button>
+      </form>
+      <div id="result" class="hidden"></div>
+    </section>
+  </main>
+  <script>
+    const connection = document.querySelector('#connection');
+    const form = document.querySelector('#task-form');
+    const send = document.querySelector('#send');
+    const result = document.querySelector('#result');
+    let phoneId;
+
+    async function connectPhone() {
+      const response = await fetch('/api/v1/phones/auto-connect', { method: 'POST' });
+      if (!response.ok) throw new Error('Server rejected phone registration');
+      const phone = await response.json();
+      phoneId = phone.id;
+      connection.textContent = `Connected as ${phone.id.slice(0, 8)} through this phone.`;
+      send.disabled = false;
+    }
+
+    async function waitForResult(taskId) {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const response = await fetch('/api/v1/tasks');
+        const tasks = await response.json();
+        const task = tasks.find(item => item.id === taskId);
+        if (task && ['COMPLETED', 'CANCELLED'].includes(task.status)) return task;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      throw new Error('Timed out waiting for the PC');
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      send.disabled = true;
+      result.classList.remove('hidden');
+      result.textContent = 'Sending to the PC...';
+      try {
+        const response = await fetch('/api/v1/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phoneId, taskName: 'MobileTextTask', taskType: document.querySelector('#task-type').value, input: document.querySelector('#input').value, cpuCoresRequired: 1, ramRequired: 1, estimatedDuration: 1, priority: 1 }) });
+        const task = await response.json();
+        await fetch('/api/v1/scheduler/schedule?strategy=BALANCED', { method: 'POST' });
+        const finished = await waitForResult(task.id);
+        result.textContent = finished.status === 'COMPLETED' ? `Completed on the PC.\n\nResult:\n${finished.result}` : `Task failed: ${finished.error}`;
+      } catch (error) {
+        result.textContent = error.message;
+      } finally { send.disabled = false; }
+    });
+
+    connectPhone().catch(error => { connection.textContent = error.message; });
+  </script>
+</body>
+</html>
