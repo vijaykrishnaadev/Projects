@@ -1,0 +1,3 @@
+package com.cloudscheduler.core.model;
+import java.util.UUID;
+public class Phone { private final String id=UUID.randomUUID().toString(); private String phoneName,userId,deviceModel,ipAddress; private boolean connected=true; public String getId(){return id;} public String getPhoneName(){return phoneName;} public void setPhoneName(String v){phoneName=v;} public String getUserId(){return userId;} public void setUserId(String v){userId=v;} public String getDeviceModel(){return deviceModel;} public void setDeviceModel(String v){deviceModel=v;} public String getIpAddress(){return ipAddress;} public void setIpAddress(String v){ipAddress=v;} public boolean isConnected(){return connected;} public void setConnected(boolean v){connected=v;} }
